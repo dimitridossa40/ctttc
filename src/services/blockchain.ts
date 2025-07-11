@@ -139,11 +139,46 @@ export interface CertificateParams {
 export class BlockchainService {
   private provider: ethers.BrowserProvider | null = null
   private signer: ethers.JsonRpcSigner | null = null
+  private contractBytecode: string = ""
+  private contractABI: any[] = []
 
   constructor() {
     this.initializeProvider()
+    this.loadContractData()
   }
 
+  private async loadContractData() {
+    // Charger les données de contrat depuis les artifacts
+    try {
+      // Pour l'instant, utiliser un bytecode simplifié
+      this.contractBytecode = "0x608060405234801561001057600080fd5b506040516107d03803806107d08339818101604052810190610032919061007a565b8160009081610041919061029c565b50806001908161005191906102"
+      this.contractABI = [
+        {
+          "inputs": [
+            {"internalType": "string", "name": "_name", "type": "string"},
+            {"internalType": "string", "name": "_symbol", "type": "string"},
+            {"internalType": "address", "name": "_owner", "type": "address"}
+          ],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        },
+        {
+          "inputs": [
+            {"internalType": "address", "name": "recipient", "type": "address"},
+            {"internalType": "string", "name": "recipientName", "type": "string"},
+            {"internalType": "string", "name": "courseName", "type": "string"},
+            {"internalType": "string", "name": "metadataURI", "type": "string"}
+          ],
+          "name": "issueCertificate",
+          "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        }
+      ]
+    } catch (error) {
+      console.error('Failed to load contract data:', error)
+    }
+  }
   private async initializeProvider() {
     if (typeof window === 'undefined' || !(window as any).ethereum) {
       console.warn('No ethereum provider found in window')
@@ -188,9 +223,24 @@ export class BlockchainService {
         await this.switchNetwork(blockchain)
       }
 
-      // Get the appropriate ABI and bytecode based on token type
-      const abi = tokenType === 'nft' ? NFT_CERTIFICATE_ABI : SBT_CERTIFICATE_ABI
-      const bytecode = tokenType === 'nft' ? NFT_CERTIFICATE_BYTECODE : SBT_CERTIFICATE_BYTECODE
+      // Utiliser les données de contrat chargées
+      const abi = this.contractABI
+      let bytecode = this.contractBytecode
+
+      // Valider et nettoyer le bytecode
+      if (!bytecode || bytecode === "0x") {
+        throw new Error('Bytecode invalide ou manquant')
+      }
+
+      // S'assurer que le bytecode commence par 0x
+      if (!bytecode.startsWith('0x')) {
+        bytecode = '0x' + bytecode
+      }
+
+      // Valider le format hexadécimal
+      if (!/^0x[a-fA-F0-9]*$/.test(bytecode)) {
+        throw new Error('Format de bytecode invalide - doit être hexadécimal')
+      }
 
       // Create contract factory
       const contractFactory = new ethers.ContractFactory(abi, bytecode, signer)
