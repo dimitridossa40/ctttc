@@ -124,14 +124,27 @@ export const useBlockchain = () => {
 
       setDeploymentStatus('Déploiement du contrat...')
       
-      // Déployer le contrat
-      const result = await blockchainService.deployContract({
-        name: companyName,
-        symbol: symbol,
-        tokenType: tokenType,
-        blockchain: blockchain,
-        ownerAddress: address
+      // Déployer le contrat via l'API backend
+      const response = await fetch('/api/contracts/deploy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          companyName,
+          description,
+          symbol,
+          blockchain
+        })
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erreur lors du déploiement')
+      }
+
+      const result = await response.json()
 
       setDeploymentStatus('Contrat déployé avec succès!')
       
@@ -159,6 +172,8 @@ export const useBlockchain = () => {
         errorMessage = 'Erreur de gas - Ajustez le gas limit'
       } else if (error.message?.includes('réseau')) {
         errorMessage = error.message
+      } else if (error.message?.includes('BytesLike') || error.message?.includes('INVALID_ARGUMENT')) {
+        errorMessage = 'Erreur de format de contrat - Veuillez réessayer'
       } else if (error.message) {
         errorMessage = error.message
       }
